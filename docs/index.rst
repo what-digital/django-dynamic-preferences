@@ -18,7 +18,7 @@ Dynamic-preferences allow you to register settings (a.k.a. preferences) in a dec
 
 With dynamic-preferences, you can update settings on the fly, through django's admin or custom forms, without restarting your application.
 
-The project is tested and work under Python 2.7 and 3.4, with django 1.7 and 1.8.
+The project is tested and work under Python 2.7 and 3.4, 3.5 and 3.6, with django >=1.8.
 
 Features
 --------
@@ -29,8 +29,13 @@ Features
 * Bundled with global and per-user preferences
 * Can be extended to other models if need (e.g. per-site preferences)
 * Integrates with django caching mechanisms to improve performance
+* Django REST Framework integration
 
 If you're still interested, head over :doc:`installation`.
+
+.. warning::
+    There is a critical bug in version 1.2 that can result in dataloss. Please upgrade to 1.3 as
+    soon as possible and do not use 1.2 in production. See `#81 <https://github.com/EliotBerriot/django-dynamic-preferences/pull/81>`_ for more details.
 
 Contents:
 
@@ -39,9 +44,11 @@ Contents:
 
    installation
    quickstart
-   settings
+   bind_preferences_to_models
+   preference_types
+   rest_api
+   lifecycle
    upgrade
    contributing
    authors
    history
-   readme

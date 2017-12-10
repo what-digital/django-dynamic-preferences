@@ -1,39 +1,8 @@
 Quickstart
 ==========
 
-Installation
-************
-
-Dynamic-preferences is available on `PyPi <https://pypi.python.org/pypi/django-dynamic-preferences>`_ and can be installed with::
-
-    pip install django-dynamic-preferences
-
-Setup
-*****
-
-Add this to your :py:const:`settings.INSTALLED_APPS`::
-
-    INSTALLED_APPS = (
-        # ...
-        'django.contrib.auth',
-        'dynamic_preferences',
-    )
-
-Then, create missing tables in your database::
-
-    python manage.py syncdb
-
-
-Add this to :py:const:`settings.TEMPLATE_CONTEXT_PROCESSORS` if you want to access preferences from templates::
-
-    TEMPLATE_CONTEXT_PROCESSORS =  (
-        'django.core.context_processors.request',
-        'dynamic_preferences.processors.global_preferences',
-    )
-
-
 Glossary
-********
+--------
 
 .. glossary::
 
@@ -42,10 +11,10 @@ Glossary
         After being defined, preferences can be tied via registries to one ore many preference models, which will deal with database persistence.
 
     PreferenceModel
-        A model that store preferences values in database. A preference model may be tied to a particular instance, which is the case for UserPreferenceModel, or concern the whole project, as GlobalPreferenceModel.
+        A model that store preferences values in database. A preference model may be tied to a particular model instance, which is the case for UserPreferenceModel, or concern the whole project, as GlobalPreferenceModel.
 
 Create and register your own preferences
-****************************************
+----------------------------------------
 
 In this example, we assume you are building a blog. Some preferences will apply to your whole project, while others will belong to specific users.
 
@@ -57,8 +26,10 @@ Let's declare a few preferences in this file:
 
     # blog/dynamic_preferences_registry.py
 
-    from dynamic_preferences.types import BooleanPreference, StringPreference, Section
-    from dynamic_preferences import user_preferences_registry, global_preferences_registry
+    from dynamic_preferences.types import BooleanPreference, StringPreference
+    from dynamic_preferences.preferences import Section
+    from dynamic_preferences.registries import global_preferences_registry
+    from dynamic_preferences.users.registries import user_preferences_registry
 
     # we create some section objects to link related preferences together
 
@@ -95,13 +66,13 @@ The :py:attr:`name` attribute is a unique identifier for your preference. Howeve
     you'll have to write a data migration.
 
 Retrieve and update preferences
-*******************************
+-------------------------------
 
 You can get and update preferences via a ``Manager``, a dictionary-like object. The logic is almost exactly the same for global preferences and per-instance preferences.
 
 .. code-block:: python
 
-    from dynamic_preferences import global_preferences_registry
+    from dynamic_preferences.registries import global_preferences_registry
 
     # We instantiate a manager for our global preferences
     global_preferences = global_preferences_registry.manager()
@@ -136,7 +107,7 @@ When you access a preference value (e.g. via ``global_preferences['maintenance_m
 
 1. It checks for the cached value (using classic django cache mechanisms)
 2. If no cache key is found, it queries the database for the value
-3. If the value does not exists in database, a new row is added with the default preference value, and the value is returned. The cache is updated to avoid another database query the nex time you want to retrieve the value.
+3. If the value does not exists in database, a new row is added with the default preference value, and the value is returned. The cache is updated to avoid another database query the next time you want to retrieve the value.
 
 Therefore, in the worst-case scenario, accessing a single preference value can trigger up to two database queries. Most of the time, however, dynamic-preferences will only hit the cache.
 
@@ -158,8 +129,34 @@ A few other methods are available on managers to retrieve preferences:
    The preference section name (if any) is removed from the identifier
 - `manager.get_by_name(name)`: returns a single preference value using only the preference name
 
+Additional validation
+---------------------
+
+In some situations, you'll want to enforce custom rules for your preferences
+values, and raise validation errors when those rules are not matched.
+
+You can implement that behaviour by declaring a ``validate`` method on your preference
+class, as follows:
+
+.. code-block:: python
+
+    from django.forms import ValidationError
+
+    # We start with a global preference
+    @global_preferences_registry.register
+    class MeaningOfLife(IntegerPreference):
+        name = 'meaning_of_life'
+        default = 42
+
+        def validate(self, value):
+            # ensure the meaning of life is always 42
+            if value != 42:
+                raise ValidationError('42 only')
+
+Internally, the validate method is pass as `a validator <https://docs.djangoproject.com/en/1.11/ref/validators/>`_ to the underlying form field.
+
 About serialization
-*******************
+-------------------
 
 When you get or set preferences values, you interact with Python values. On the database/cache side, values are serialized before storage.
 
@@ -167,13 +164,15 @@ Dynamic preferences handle this for you, using each preference type (BooleanPref
 
 
 Admin integration
-*****************
+-----------------
 
 Dynamic-preferences integrates with `django.contrib.admin` out of the box. You can therefore use the admin interface to edit preferences values, which is particularly convenient for global preferences.
 
 Forms
-*****
+-----
 
+Form builder
+^^^^^^^^^^^^
 A form builder is provided if you want to create and update preferences in custom views.
 
 .. code-block:: python
@@ -203,8 +202,41 @@ Getting a form for a specific instance preferences works similarly, except that 
     form_class = user_preference_form_builder(instance=request.user)
     form_class = user_preference_form_builder(instance=request.user, section='discussion')
 
+
+Form fields
+^^^^^^^^^^^
+
+In various places, a dynamic form field will be created from preferences.
+Consider the following example:
+
+.. code-block:: python
+
+    class MyPreference(StringPreference):
+        default = 'my text'
+
+In the admin area and using the form builder, the generated form field
+would look like this:
+
+.. code-block:: python
+
+    from django import forms
+
+    field = forms.CharField(initial='my text')
+
+You can customize the behaviour and instanciation of the underlying form
+field using the following attributes and methods on any preference class:
+
+.. autoclass:: dynamic_preferences.types.BasePreferenceType
+    :noindex:
+    :members:
+        field_class,
+        field_kwargs,
+        get_field_kwargs,
+        validate
+
+
 Preferences attributes
-**********************
+----------------------
 
 You can customize a lof of preferences behaviour some class attributes / methods.
 
@@ -236,7 +268,7 @@ Both methods are perfectly valid. You can override the following attributes:
 * ``widget``: the widget used for the form field
 
 Accessing global preferences within a template
-**********************************************
+----------------------------------------------
 
 Dynamic-preferences provide a context processors (remember to add them to your settings, as described in "Installation") that will pass global preferences values to your templates:
 
@@ -254,7 +286,7 @@ Dynamic-preferences provide a context processors (remember to add them to your s
 
 
 Bundled views and urls
-**********************
+----------------------
 
 Example views and urls are bundled for global and per-user preferences updating. Include this in your URLconf:
 
@@ -265,7 +297,9 @@ Example views and urls are bundled for global and per-user preferences updating.
         url(r'^preferences/', include('dynamic_preferences.urls')),
     ]
 
-Then, in your code::
+Then, in your code:
+
+.. code-block:: python
 
     from django.core.urlresolvers import reverse
 

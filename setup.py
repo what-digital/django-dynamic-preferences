@@ -36,14 +36,15 @@ setup(
     ],
     include_package_data=True,
     install_requires=[
-        'django>=1.7',
+        'django>=1.8',
         'six',
+        'persisting_theory==0.2.1',
     ],
     license="BSD",
     zip_safe=False,
     keywords='django-dynamic-preferences',
     classifiers=[
-        'Development Status :: 3 - Alpha',
+        'Development Status :: 5 - Production/Stable',
         'Framework :: Django',
         'Intended Audience :: Developers',
         'License :: OSI Approved :: BSD License',

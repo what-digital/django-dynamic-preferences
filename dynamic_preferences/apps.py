@@ -1,8 +1,7 @@
-from django.apps import AppConfig
+from django.apps import AppConfig, apps
+from django.conf import settings
 
-from . import global_preferences_registry
-from .registries import autodiscover, preference_models
-from .dynamic_preferences_registry import user_preferences_registry, global_preferences_registry
+from .registries import preference_models, global_preferences_registry
 
 
 class DynamicPreferencesConfig(AppConfig):
@@ -10,10 +9,12 @@ class DynamicPreferencesConfig(AppConfig):
     verbose_name = "Dynamic Preferences"
 
     def ready(self):
-        UserPreferenceModel = self.get_model('UserPreferenceModel')
         GlobalPreferenceModel = self.get_model('GlobalPreferenceModel')
 
-        preference_models.register(UserPreferenceModel, user_preferences_registry)
-        preference_models.register(GlobalPreferenceModel, global_preferences_registry)
+        preference_models.register(
+            GlobalPreferenceModel, global_preferences_registry)
 
-        autodiscover()
+        # This will load all dynamic_preferences_registry.py files under
+        # installed apps
+        app_names = [app.name for app in apps.app_configs.values()]
+        global_preferences_registry.autodiscover(app_names)

@@ -7,8 +7,7 @@ from django.db.models.query import QuerySet
 from django.conf import settings
 from django.utils.functional import cached_property
 
-from dynamic_preferences import user_preferences_registry, global_preferences_registry
-from dynamic_preferences.registries import preference_models
+from dynamic_preferences.registries import preference_models, global_preferences_registry
 from .utils import update
 
 
@@ -34,7 +33,8 @@ class BasePreferenceModel(models.Model):
 
     @cached_property
     def preference(self):
-        return self.registry.get(section=self.section, name=self.name)
+        return self.registry.get(
+            section=self.section, name=self.name, fallback=True)
 
     @property
     def verbose_name(self):
@@ -61,8 +61,7 @@ class BasePreferenceModel(models.Model):
     def save(self, **kwargs):
 
         if self.pk is None and not self.raw_value:
-
-                self.value = self.preference.default
+            self.value = self.preference.get('default')
         super(BasePreferenceModel, self).save(**kwargs)
 
     def __str__(self):
@@ -99,37 +98,12 @@ class PerInstancePreferenceModel(BasePreferenceModel):
     def get_instance_model(cls):
         return cls._meta.get_field('instance').rel.to
 
-    @property
-    def registry(self):
-        return preference_models.get_by_instance(self.instance)
-
-
-class UserPreferenceModel(PerInstancePreferenceModel):
-
-    instance = models.ForeignKey(settings.AUTH_USER_MODEL)
-
-    class Meta(PerInstancePreferenceModel.Meta):
-        app_label = 'dynamic_preferences'
-        verbose_name = "user preference"
-        verbose_name_plural = "user preferences"
-
 
 global_preferences_registry.preference_model = GlobalPreferenceModel
 
 # Create default preferences for new instances
 
 from django.db.models.signals import post_save
-
-
-def create_default_per_instance_preferences(sender, created, instance, **kwargs):
-    """Create default preferences for PerInstancePreferenceModel"""
-
-    if created:
-        try:
-            registry = preference_models.get_by_instance(instance)
-            registry.create_default_preferences(instance)
-        except AttributeError:
-            pass
 
 
 def invalidate_cache(sender, created, instance, **kwargs):
@@ -144,5 +118,4 @@ def invalidate_cache(sender, created, instance, **kwargs):
     manager = registry.manager(**kwargs)
     manager.to_cache(instance)
 
-post_save.connect(create_default_per_instance_preferences)
 post_save.connect(invalidate_cache)

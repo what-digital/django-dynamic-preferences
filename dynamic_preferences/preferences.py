@@ -8,22 +8,40 @@ which store the actual values.
 
 """
 from __future__ import unicode_literals
+import re
 import warnings
 
 from .settings import preferences_settings
 from .exceptions import MissingDefault
 from .serializers import UNSET
 
+class InvalidNameError(ValueError):
+    pass
+
+def check_name(name, obj):
+    error = None
+    if not re.match('^\w+$', name):
+        error = 'Non-alphanumeric / underscore characters are forbidden in section and preferences names'
+    if preferences_settings.SECTION_KEY_SEPARATOR in name:
+        error = 'Sequence "{0}" is forbidden in section and preferences name, since it is used to access values via managers'.format(preferences_settings.SECTION_KEY_SEPARATOR)
+
+    if error:
+        full_message = 'Invalid name "{0}" while instanciating {1} object: {2}'.format(name, obj, error)
+        raise InvalidNameError(full_message)
+
 class Section(object):
 
     def __init__(self, name, verbose_name=None):
         self.name = name
         self.verbose_name = verbose_name or name
+        if preferences_settings.VALIDATE_NAMES and name:
+            check_name(self.name, self)
 
     def __str__(self):
-        if not self.name:
+        if not self.verbose_name:
             return ''
-        return str(self.name)
+        return str(self.verbose_name)
+
 
 EMPTY_SECTION = Section(None)
 
@@ -43,7 +61,8 @@ class AbstractPreference(object):
     default = UNSET
 
     def __init__(self, registry=None):
-
+        if preferences_settings.VALIDATE_NAMES:
+            check_name(self.name, self)
         if self.section and not hasattr(self.section, 'name'):
             self.section = Section(name=self.section)
             warnings.warn("Implicit section instanciation is deprecated and "
